@@ -1,15 +1,12 @@
-use std::{collections::HashMap, f64::consts::PI};
+use std::collections::HashMap;
 
-use crate::{math::{matrix::Matrix, vector2::Vector2}, renderer::Renderer};
+use crate::math::vector2::Vector2;
 
 use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, Collider, RigidBody}, spatial_grid::SpatialGrid};
-
 
 pub struct PhysicsWorld {
     grid: SpatialGrid,
     pub bodies: HashMap<String, RigidBody>,
-    //debug_points: Vec<Vector2>,
-    //debug_lines: Vec<(Vector2, Vector2)>,
     constraints: Vec<Box<dyn Constraint>>,
     bounds: BoundingBox,
 }
@@ -21,60 +18,6 @@ impl GetBounds for PhysicsWorld {
 }
 
 impl PhysicsWorld {
-    pub fn debug_render(&mut self, renderer: &mut Renderer) {
-        for (_, body) in self.bodies.iter_mut() {
-            let mut points = vec![];
-
-            match &body.collider {
-                Collider::Circle { radius } => {
-                    let mut angle = 0.0;
-                    let iterations = 16.0;
-
-                    for _ in 0..iterations as usize {
-                        angle += PI * 2.0 / iterations;
-                        points.push(Vector2::new(angle.sin() * radius, angle.cos() * radius))
-                    }
-                }
-
-                Collider::Polygon { vertices } => {
-                    points.append(&mut vertices.clone()); 
-                }
-            }
-
-            let transform = Matrix::new().scale(body.scale).rot(body.rotation);
-            
-            for point in points.iter_mut() {
-                *point = transform.vec_mul(point);
-            }
-            
-            let mut last = &points[points.len()-1];
-            
-            for i in 0..points.len() {
-                let current = &points[i];
-                
-                renderer.set_color(0, 0, 0, 255);
-
-                let a = *last + body.position;
-                let b = *current + body.position;
-
-                renderer.line(a.x as i32, a.y as i32, b.x as i32, b.y as i32);
-
-                last = current;
-            }
-        }
-
-        //for point in self.debug_points.iter() {
-        //    canvas.set_draw_color(sdl2::pixels::Color::RGBA(255, 0, 0, 255));
-        //    canvas.draw_rect(Rect::new((point.x - 2.0) as i32, (point.y - 2.0) as i32, 4.0 as u32, 4.0 as u32)).unwrap();
-        //}
-
-        //
-        //for (p1, p2) in self.debug_lines.iter() {
-        //    canvas.set_draw_color(sdl2::pixels::Color::RGBA(255, 0, 0, 255));
-        //    canvas.draw_line(*p1, *p2).unwrap();
-        //}
-    }
-
     fn solve_collisions(&mut self) { 
         for (k, v) in self.bodies.iter_mut() {
             self.grid.update(k, v);

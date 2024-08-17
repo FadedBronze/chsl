@@ -1,17 +1,9 @@
 use std::ops::{Add, AddAssign, Mul, Sub, SubAssign};
 
-use sdl2::rect::Point;
-
 #[derive(Clone, Copy, Debug)]
 pub struct Vector2 {
     pub x: f64,
     pub y: f64, 
-}
-
-impl Into<Point> for Vector2 {
-    fn into(self) -> Point {
-        return Point::new(self.x as i32, self.y as i32);
-    }
 }
 
 impl Mul<Vector2> for f64 {
