@@ -1,7 +1,7 @@
 use std::{collections::{HashMap, HashSet}, usize};
 
 use crate::math::vector2::Vector2;
-use super::{bounding_box::{BoundingBox, GetBounds}};
+use super::bounding_box::{BoundingBox, GetBounds};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SpatialInfo {
@@ -47,13 +47,8 @@ impl SpatialGrid {
     pub fn insert<T: GetBounds>(&mut self, id: &String, element: &mut T) {
         let (min_x, min_y, max_x, max_y) = self.get_grid_bounds(element);
 
-        let width = self.bounds.width / self.cell_count_x as f64;
-        let height = self.bounds.height / self.cell_count_y as f64;
-
         for y in min_y..=max_y {
             for x in min_x..=max_x {
-                //BoundingBox {x: x as f64 * width, y: y as f64 * height, width, height}.debug_x(debug_lines);
-
                 let idx = self.get_index((x, y));
                 self.grid[idx].insert(id.clone());
             }

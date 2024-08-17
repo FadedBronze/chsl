@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::math::vector2::Vector2;
 
-use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, Collider, RigidBody}, spatial_grid::SpatialGrid};
+use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
 
 pub struct PhysicsWorld {
     grid: SpatialGrid,
@@ -48,17 +48,15 @@ impl PhysicsWorld {
                 *velocity += Vector2::new(0.0, 981.0) * delta_timestep * *gravity_scale;
             }
             
-            ////constraints
-            //for constraint in self.constraints.iter_mut() {
-            //    constraint.solve(&mut self.bodies, delta_timestep)
-            //}
+            for constraint in self.constraints.iter_mut() {
+                constraint.solve(&mut self.bodies, delta_timestep)
+            }
             
             self.solve_collisions();
             
-            ////constraints
-            //for constraint in self.constraints.iter_mut() {
-            //    constraint.solve(&mut self.bodies, delta_timestep)
-            //}
+            for constraint in self.constraints.iter_mut() {
+                constraint.solve(&mut self.bodies, delta_timestep)
+            }
             
             //update via integration
             for (_, body) in self.bodies.iter_mut() {
@@ -94,14 +92,18 @@ impl PhysicsWorld {
             grid: SpatialGrid::new(bounds, 14, 10),
             bodies: HashMap::new(),
             constraints: vec![],
-            //debug_lines: vec![],
-            //debug_points: vec![],
         }
     }
 
     pub fn add_body(&mut self, key: &str, mut rigidbody: RigidBody) {
         self.grid.insert(&key.to_string(), &mut rigidbody);
         self.bodies.insert(key.to_string(), rigidbody);
+    }
+
+    pub fn remove_body(&mut self, key: &str) {
+        let PhysicsWorld { grid, bodies, .. } = self;
+        grid.remove::<RigidBody>(&key.to_string());
+        bodies.remove(&key.to_string());
     }
 
     pub fn add_constraint(&mut self, constraint: Box<dyn Constraint>) {

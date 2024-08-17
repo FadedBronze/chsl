@@ -1,6 +1,6 @@
-use std::{collections::HashMap, f64::consts::PI};
+use std::collections::HashMap;
 
-use crate::math::{point_line_distance::{point_line_distance, point_line_distance_unclamped}, vector2::Vector2};
+use crate::math::{point_line_distance::point_line_distance_unclamped, vector2::Vector2};
 
 use super::rigidbody::RigidBody;
 
