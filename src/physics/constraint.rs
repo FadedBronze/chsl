@@ -4,139 +4,125 @@ use crate::math::{point_line_distance::point_line_distance_unclamped, vector2::V
 
 use super::rigidbody::RigidBody;
 
-pub trait Constraint {
-    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> ();
-    fn get_deps(&mut self) -> Vec<&String>;
-}
-
-pub enum Joints {
-    DJ(DistanceJoint),
-    LJ(LookJoint),
-    SJ(SlideJoint),
-    FJ(FixedJoint)
-}
-
-pub struct DistanceJoint {
-    pub distance: f64,
-    pub strength: f64,
-    pub body_a: String,
-    pub body_b: String,
-}
-
-impl Constraint for DistanceJoint {
-    fn get_deps(&mut self) -> Vec<&String> {
-        vec![&self.body_a, &self.body_b]
+pub enum Constraint {
+    DistanceJoint {
+        distance: f64,
+        strength: f64,
+        body_a: String,
+        body_b: String,
+    },
+    LookJoint {
+        strength: f64,
+        body_a: String,
+        body_b: String,
+    },
+    FixedJoint {
+        body: String,
+        position: Vector2,
+        rotation: f64,
+    },
+    SlideJoint {
+        body: String,
+        position: Vector2,
+        angle: f64,
+        strength: f64,
     }
-    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
-        let a = bodies.get(&self.body_a).unwrap().clone();
-        let b = bodies.get(&self.body_b).unwrap().clone();
+}
 
-        let delta = b.position - a.position;
+impl Constraint {
+    pub fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
+        match self {
+            Self::DistanceJoint { distance, strength, body_a, body_b } => {
+                let a = bodies.get(body_a).unwrap().clone();
+                let b = bodies.get(body_b).unwrap().clone();
 
-        let offset = self.distance - delta.mag();
+                let delta = b.position - a.position;
 
-        let norm = delta.norm();
+                let offset = distance - delta.mag();
 
-        let bias = (self.strength / delta_timestep) * offset;
+                let norm = delta.norm();
 
-        let relvel = b.velocity - a.velocity;
+                let bias = (strength / delta_timestep) * offset;
 
-        let lambda = -(relvel.dot(&norm) - bias) / (a.inv_mass + b.inv_mass);
+                let relvel = b.velocity - a.velocity;
 
-        {
-            bodies.get_mut(&self.body_a).unwrap().velocity += norm * -lambda * a.inv_mass;
+                let lambda = -(relvel.dot(&norm) - bias) / (a.inv_mass + b.inv_mass);
+
+                {
+                    bodies.get_mut(body_a).unwrap().velocity += norm * -lambda * a.inv_mass;
+                }
+                
+                {
+                    bodies.get_mut(body_b).unwrap().velocity += norm * lambda * b.inv_mass;
+                }
+            }
+            Self::LookJoint { strength, body_a, body_b } => {
+                let a = bodies.get(body_a).unwrap().clone();
+                let b = bodies.get(body_b).unwrap().clone();
+
+                let delta_pos = b.position - a.position;
+                let norm = delta_pos.norm();
+
+                let target_rot = f64::atan2(norm.y, norm.x);
+
+                let ca = (target_rot - a.rotation).sin();
+                let cb = (target_rot - b.rotation).sin();
+
+                let bias_a = (strength / delta_timestep) * ca;
+                let bias_b = (strength / delta_timestep) * cb;
+
+                {
+                    let a = bodies.get_mut(body_a).unwrap();
+                    a.ang_velocity = bias_a;
+                }
+
+                {
+                    let b = bodies.get_mut(body_b).unwrap();
+                    b.ang_velocity = bias_b;
+                }
+            }
+            Self::FixedJoint { body, position, rotation } => {
+                let body = bodies.get_mut(body).unwrap();
+
+                body.position = position.clone();
+                body.rotation = rotation.clone();
+                body.velocity = Vector2::zero();
+                body.ang_velocity = 0.0;
+            }
+            Self::SlideJoint { body, position, angle, strength } => {
+                let body = bodies.get_mut(body).unwrap();
+
+                let dir = Vector2::new(angle.sin(), angle.cos());
+
+                let mut closest_point = Vector2::zero();
+                point_line_distance_unclamped(position.clone(), position.clone() + dir.perp(), body.position, Some(&mut closest_point));
+
+                let delta = closest_point - body.position;
+
+                let c = delta.mag();
+
+                let bias = (strength / delta_timestep) * c;
+
+                let impulse = -body.velocity.dot(&dir); 
+
+                body.velocity += impulse * dir + bias * delta.norm();
+            }
+        }    
+    }
+    pub fn get_deps(&mut self) -> Vec<&String> {
+        match self {
+            Self::DistanceJoint { body_a, body_b, .. } => {
+                vec![body_a, body_b]
+            }
+            Self::LookJoint { body_a, body_b, .. } => {
+                vec![body_a, body_b]
+            }
+            Self::FixedJoint { body, .. } => {
+                vec![body]
+            }
+            Self::SlideJoint { body, ..} => {
+                vec![body] 
+            }
         }
-        
-        {
-            bodies.get_mut(&self.body_b).unwrap().velocity += norm * lambda * b.inv_mass;
-        }
     }
-}
-
-pub struct LookJoint {
-    pub strength: f64,
-    pub body_a: String,
-    pub body_b: String,
-}
-
-impl Constraint for LookJoint {
-    fn get_deps(&mut self) -> Vec<&String> {
-        vec![&self.body_a, &self.body_b]
-    }
-    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
-        let a = bodies.get(&self.body_a).unwrap().clone();
-        let b = bodies.get(&self.body_b).unwrap().clone();
-
-        let delta_pos = b.position - a.position;
-        let norm = delta_pos.norm();
-
-        let target_rot = f64::atan2(norm.y, norm.x);
-
-        let ca = (target_rot - a.rotation).sin();
-        let cb = (target_rot - b.rotation).sin();
-
-        let bias_a = (self.strength / delta_timestep) * ca;
-        let bias_b = (self.strength / delta_timestep) * cb;
-
-        {
-            let a = bodies.get_mut(&self.body_a).unwrap();
-            a.ang_velocity = bias_a;
-        }
-
-        {
-            let b = bodies.get_mut(&self.body_b).unwrap();
-            b.ang_velocity = bias_b;
-        }
-    }
-}
-
-pub struct FixedJoint {
-    pub body: String,
-    pub position: Vector2,
-    pub rotation: f64,
-}
-
-impl Constraint for FixedJoint {
-    fn get_deps(&mut self) -> Vec<&String> {
-        vec![&self.body]
-    }
-    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, _delta_timestep: f64) -> () {
-        let body = bodies.get_mut(&self.body).unwrap();
-
-        body.position = self.position;
-        body.rotation = self.rotation;
-        body.velocity = Vector2::zero();
-        body.ang_velocity = 0.0;
-    }
-}
-
-pub struct SlideJoint {
-    pub body: String,
-    pub position: Vector2,
-    pub angle: f64,
-    pub strength: f64,
-}
-
-impl Constraint for SlideJoint {
-    fn get_deps(&mut self) -> Vec<&String> {
-        vec![&self.body] 
-    }
-    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
-        let body = bodies.get_mut(&self.body).unwrap();
-
-        let dir = Vector2::new(self.angle.sin(), self.angle.cos());
-
-        let mut closest_point = Vector2::zero();
-        point_line_distance_unclamped(self.position, self.position + dir.perp(), body.position, Some(&mut closest_point));
-
-        let delta = closest_point - body.position;
-
-        let c = delta.mag();
-
-        let bias = (self.strength / delta_timestep) * c;
-
-        let impulse = -body.velocity.dot(&dir); 
-
-        body.velocity += impulse * dir + bias * delta.norm();
-   } 
 }

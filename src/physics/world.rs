@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use crate::math::vector2::Vector2;
 
-use super::{bounding_box::{BoundingBox, GetBounds}, constraint::{self, Constraint}, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
+use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
 
 pub struct PhysicsWorld {
     grid: SpatialGrid,
     bodies: HashMap<String, RigidBody>,
-    constraints: HashMap<String, Box<dyn Constraint>>,
+    constraints: HashMap<String, Constraint>,
     bounds: BoundingBox,
 }
 
@@ -22,7 +22,7 @@ impl PhysicsWorld {
         &mut self.bodies
     }
 
-    pub fn all_constraints(&mut self) -> &mut HashMap<String, Box<dyn Constraint>> {
+    pub fn all_constraints(&mut self) -> &mut HashMap<String, Constraint> {
         &mut self.constraints
     }
 
@@ -32,22 +32,22 @@ impl PhysicsWorld {
         }
 
         self.grid.potential_collisions(&mut self.bodies, |body_a, body_b| { 
-           if let Some(mut collision) = overlapping(body_a, body_b) {
-               collision.contact_points = Some(contact_points(body_a, body_b, &collision));
+            if let Some(mut collision) = overlapping(body_a, body_b) {
+                collision.contact_points = Some(contact_points(body_a, body_b, &collision));
 
-               if collision.flipped {
-                   collision.body_b = Some(body_a);
-                   collision.body_a = Some(body_b);
-               } else {
-                   collision.body_a = Some(body_a);
-                   collision.body_b = Some(body_b);
-               } 
-               
-               resolve_collision(&mut collision);
-           }
+                if collision.flipped {
+                    collision.body_b = Some(body_a);
+                    collision.body_a = Some(body_b);
+                } else {
+                    collision.body_a = Some(body_a);
+                    collision.body_b = Some(body_b);
+                } 
+
+                resolve_collision(&mut collision);
+            }
         });
     }
-    
+
     //clean out of bounds and deleted bodies and constraints
     fn clean(&mut self) {
         for (_, body) in self.bodies.iter_mut() {
@@ -57,9 +57,9 @@ impl PhysicsWorld {
         }
 
         let PhysicsWorld { grid, bodies, constraints, .. } = self;
-        
+
         let keys: Vec<String> = bodies.keys().cloned().collect();
- 
+
         for key in keys {
             let body = bodies.get_mut(&key).unwrap();
             let deleted = body.deleted.clone();
@@ -96,17 +96,17 @@ impl PhysicsWorld {
 
         for _ in 0..steps {             
             self.gravity(delta_timestep);
-            
+
             for (_, constraint) in self.constraints.iter_mut() {
                 constraint.solve(&mut self.bodies, delta_timestep)
             }
-            
+
             self.solve_collisions();
-            
+
             for (_, constraint) in self.constraints.iter_mut() {
                 constraint.solve(&mut self.bodies, delta_timestep)
             }
-            
+
             //update via integration
             for (_, body) in self.bodies.iter_mut() {
                 body.update(delta_timestep);
@@ -134,7 +134,7 @@ impl PhysicsWorld {
         self.bodies.get_mut(key).unwrap().deleted = true;
     }
 
-    pub fn add_constraint(&mut self, key: &str, constraint: Box<dyn Constraint>) {
+    pub fn add_constraint(&mut self, key: &str, constraint: Constraint) {
         self.constraints.insert(key.to_string(), constraint);
     }
 
