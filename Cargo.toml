@@ -2,5 +2,7 @@
 name = "chsl"
 version = "0.1.0"
 edition = "2021"
+description = "2D Game Physics Engine supporting Joints/Constraints"
+license = "MIT"
 
 [dependencies]
