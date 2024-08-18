@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use crate::math::vector2::Vector2;
 
-use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
+use super::{bounding_box::{BoundingBox, GetBounds}, constraint::{self, Constraint}, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
 
 pub struct PhysicsWorld {
     grid: SpatialGrid,
-    pub bodies: HashMap<String, RigidBody>,
-    constraints: Vec<Box<dyn Constraint>>,
+    bodies: HashMap<String, RigidBody>,
+    constraints: HashMap<String, Box<dyn Constraint>>,
     bounds: BoundingBox,
 }
 
@@ -18,6 +18,14 @@ impl GetBounds for PhysicsWorld {
 }
 
 impl PhysicsWorld {
+    pub fn all_bodies(&mut self) -> &mut HashMap<String, RigidBody> {
+        &mut self.bodies
+    }
+
+    pub fn all_constraints(&mut self) -> &mut HashMap<String, Box<dyn Constraint>> {
+        &mut self.constraints
+    }
+
     fn solve_collisions(&mut self) { 
         for (k, v) in self.bodies.iter_mut() {
             self.grid.update(k, v);
@@ -39,39 +47,16 @@ impl PhysicsWorld {
            }
         });
     }
-
-    pub fn update(&mut self, delta_time: f64, steps: usize) {
-        let delta_timestep = delta_time / steps as f64;
-
-        for _ in 0..steps {             
-            for (_, RigidBody { velocity, gravity_scale, .. }) in self.bodies.iter_mut() {
-                *velocity += Vector2::new(0.0, 981.0) * delta_timestep * *gravity_scale;
-            }
-            
-            for constraint in self.constraints.iter_mut() {
-                constraint.solve(&mut self.bodies, delta_timestep)
-            }
-            
-            self.solve_collisions();
-            
-            for constraint in self.constraints.iter_mut() {
-                constraint.solve(&mut self.bodies, delta_timestep)
-            }
-            
-            //update via integration
-            for (_, body) in self.bodies.iter_mut() {
-                body.update(delta_timestep);
-            }
-        }
-
-        //clean out of bounds bodies
+    
+    //clean out of bounds and deleted bodies and constraints
+    fn clean(&mut self) {
         for (_, body) in self.bodies.iter_mut() {
             if !self.bounds.point_within(body.position) {
                 body.deleted = true;
             }
         }
 
-        let PhysicsWorld { grid, bodies, .. } = self;
+        let PhysicsWorld { grid, bodies, constraints, .. } = self;
         
         let keys: Vec<String> = bodies.keys().cloned().collect();
  
@@ -84,6 +69,51 @@ impl PhysicsWorld {
                 bodies.remove(&key);
             }
         }
+
+        let mut deleted_constraints = vec![];
+
+        for (constraint_key, constraint) in constraints.iter_mut() {
+            for body_key in constraint.get_deps().iter() {
+                if !bodies.contains_key(*body_key) {
+                    deleted_constraints.push(constraint_key.clone())
+                }
+            }
+        }
+
+        for constraint_key in deleted_constraints {
+            constraints.remove(&constraint_key);
+        }
+    }
+
+    fn gravity(&mut self, delta_timestep: f64) {
+        for (_, RigidBody { velocity, gravity_scale, .. }) in self.bodies.iter_mut() {
+            *velocity += Vector2::new(0.0, 981.0) * delta_timestep * *gravity_scale;
+        }
+    } 
+
+    pub fn update(&mut self, delta_time: f64, steps: usize) {
+        let delta_timestep = delta_time / steps as f64;
+
+        for _ in 0..steps {             
+            self.gravity(delta_timestep);
+            
+            for (_, constraint) in self.constraints.iter_mut() {
+                constraint.solve(&mut self.bodies, delta_timestep)
+            }
+            
+            self.solve_collisions();
+            
+            for (_, constraint) in self.constraints.iter_mut() {
+                constraint.solve(&mut self.bodies, delta_timestep)
+            }
+            
+            //update via integration
+            for (_, body) in self.bodies.iter_mut() {
+                body.update(delta_timestep);
+            }
+        }
+
+        self.clean()
     }
 
     pub fn new(bounds: BoundingBox) -> PhysicsWorld {
@@ -91,7 +121,7 @@ impl PhysicsWorld {
             bounds,
             grid: SpatialGrid::new(bounds, 14, 10),
             bodies: HashMap::new(),
-            constraints: vec![],
+            constraints: HashMap::new(),
         }
     }
 
@@ -101,12 +131,14 @@ impl PhysicsWorld {
     }
 
     pub fn remove_body(&mut self, key: &str) {
-        let PhysicsWorld { grid, bodies, .. } = self;
-        grid.remove::<RigidBody>(&key.to_string());
-        bodies.remove(&key.to_string());
+        self.bodies.get_mut(key).unwrap().deleted = true;
     }
 
-    pub fn add_constraint(&mut self, constraint: Box<dyn Constraint>) {
-        self.constraints.push(constraint);
+    pub fn add_constraint(&mut self, key: &str, constraint: Box<dyn Constraint>) {
+        self.constraints.insert(key.to_string(), constraint);
+    }
+
+    pub fn remove_constraint(&mut self, key: &str) {
+        self.constraints.remove(key);
     }
 }

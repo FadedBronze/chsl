@@ -6,6 +6,14 @@ use super::rigidbody::RigidBody;
 
 pub trait Constraint {
     fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> ();
+    fn get_deps(&mut self) -> Vec<&String>;
+}
+
+pub enum Joints {
+    DJ(DistanceJoint),
+    LJ(LookJoint),
+    SJ(SlideJoint),
+    FJ(FixedJoint)
 }
 
 pub struct DistanceJoint {
@@ -16,6 +24,9 @@ pub struct DistanceJoint {
 }
 
 impl Constraint for DistanceJoint {
+    fn get_deps(&mut self) -> Vec<&String> {
+        vec![&self.body_a, &self.body_b]
+    }
     fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
         let a = bodies.get(&self.body_a).unwrap().clone();
         let b = bodies.get(&self.body_b).unwrap().clone();
@@ -49,6 +60,9 @@ pub struct LookJoint {
 }
 
 impl Constraint for LookJoint {
+    fn get_deps(&mut self) -> Vec<&String> {
+        vec![&self.body_a, &self.body_b]
+    }
     fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
         let a = bodies.get(&self.body_a).unwrap().clone();
         let b = bodies.get(&self.body_b).unwrap().clone();
@@ -83,6 +97,9 @@ pub struct FixedJoint {
 }
 
 impl Constraint for FixedJoint {
+    fn get_deps(&mut self) -> Vec<&String> {
+        vec![&self.body]
+    }
     fn solve(&self, bodies: &mut HashMap<String, RigidBody>, _delta_timestep: f64) -> () {
         let body = bodies.get_mut(&self.body).unwrap();
 
@@ -101,7 +118,10 @@ pub struct SlideJoint {
 }
 
 impl Constraint for SlideJoint {
-   fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
+    fn get_deps(&mut self) -> Vec<&String> {
+        vec![&self.body] 
+    }
+    fn solve(&self, bodies: &mut HashMap<String, RigidBody>, delta_timestep: f64) -> () {
         let body = bodies.get_mut(&self.body).unwrap();
 
         let dir = Vector2::new(self.angle.sin(), self.angle.cos());
