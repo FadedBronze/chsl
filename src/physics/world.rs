@@ -4,11 +4,42 @@ use crate::math::vector2::Vector2;
 
 use super::{bounding_box::{BoundingBox, GetBounds}, constraint::Constraint, rigidbody::{contact_points, overlapping, resolve_collision, RigidBody}, spatial_grid::SpatialGrid};
 
+#[cfg_attr(feature="serde", derive(serde::Serialize))]
 pub struct PhysicsWorld {
+    #[cfg_attr(feature="serde", serde(skip_serializing))]
     grid: SpatialGrid,
     bodies: HashMap<String, RigidBody>,
     constraints: HashMap<String, Constraint>,
     bounds: BoundingBox,
+}
+
+#[cfg(feature="serde")]
+impl<'de> serde::Deserialize<'de> for PhysicsWorld {
+    fn deserialize<D>(deserializer: D) -> Result<Self, <D as serde::Deserializer<'de>>::Error> where D: serde::Deserializer<'de> { 
+        
+        #[cfg_attr(feature="serde", derive(serde::Deserialize))]
+        struct PhysicsWorldData {
+            bodies: HashMap<String, RigidBody>,
+            constraints: HashMap<String, Constraint>,
+            bounds: BoundingBox,
+        }
+
+        let mut data = PhysicsWorldData::deserialize(deserializer)?;
+    
+        //TODO: make the spatial grid cell count consistant
+        let mut grid = SpatialGrid::new(data.bounds, 12, 12);
+
+        for (id, body) in data.bodies.iter_mut() {
+            grid.insert(id, body);
+        }
+
+        Ok(PhysicsWorld {
+            grid,
+            bodies: data.bodies,
+            constraints: data.constraints,
+            bounds: data.bounds,
+        })
+    }
 }
 
 impl GetBounds for PhysicsWorld {

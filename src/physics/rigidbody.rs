@@ -5,6 +5,7 @@ use crate::math::{matrix::Matrix, point_line_distance::point_line_distance, vect
 use super::bounding_box::GetBounds;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature="serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Collider {
     Circle {
         radius: f64,    
@@ -15,6 +16,7 @@ pub enum Collider {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature="serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RigidBody {
     pub position: Vector2,
     pub velocity: Vector2,

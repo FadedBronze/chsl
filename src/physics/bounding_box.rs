@@ -3,7 +3,8 @@ use std::f64;
 use crate::math::{matrix::Matrix, vector2::Vector2};
 
 use super::rigidbody::{Collider, RigidBody};
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
+#[cfg_attr(feature="serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BoundingBox {
     pub x: f64,
     pub y: f64,

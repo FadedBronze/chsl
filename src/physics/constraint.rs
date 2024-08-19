@@ -4,6 +4,7 @@ use crate::math::{point_line_distance::point_line_distance_unclamped, vector2::V
 
 use super::rigidbody::RigidBody;
 
+#[cfg_attr(feature="serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Constraint {
     DistanceJoint {
         distance: f64,

@@ -8,6 +8,7 @@ pub struct SpatialInfo {
     inserted_bounds: (usize, usize, usize, usize),
 }
 
+#[derive(Default)]
 pub struct SpatialGrid {
     elements: HashMap<String, SpatialInfo>,
     grid: Vec<HashSet<String>>,
