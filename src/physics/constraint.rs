@@ -20,11 +20,12 @@ pub enum Constraint {
         body: String,
         position: Vector2,
         rotation: f64,
+        strength: f64
     },
     SlideJoint {
         body: String,
         position: Vector2,
-        angle: f64,
+        rotation: f64,
         strength: f64,
     }
 }
@@ -81,15 +82,19 @@ impl Constraint {
                     b.ang_velocity = bias_b;
                 }
             }
-            Self::FixedJoint { body, position, rotation } => {
+            Self::FixedJoint { body, position, rotation, strength } => {
                 let body = bodies.get_mut(body).unwrap();
 
-                body.position = position.clone();
-                body.rotation = rotation.clone();
-                body.velocity = Vector2::zero();
-                body.ang_velocity = 0.0;
+                let c_pos = *position - body.position;
+                let bias_pos = (strength / delta_timestep) * c_pos;
+
+                let c_rot = (*rotation - body.rotation).sin();
+                let bias_rot = (strength / delta_timestep) * c_rot;
+
+                body.velocity = bias_pos;
+                body.ang_velocity = bias_rot;
             }
-            Self::SlideJoint { body, position, angle, strength } => {
+            Self::SlideJoint { body, position, rotation: angle, strength } => {
                 let body = bodies.get_mut(body).unwrap();
 
                 let dir = Vector2::new(angle.sin(), angle.cos());
